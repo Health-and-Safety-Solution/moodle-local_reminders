@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Library function for reminders cron function.
+ * Moodle plugin that sends email reminders for calendar events.
  *
  * @package    local_reminders
  * @author     Isuru Weerarathna <uisurumadushanka89@gmail.com>
