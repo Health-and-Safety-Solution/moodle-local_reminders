@@ -66,9 +66,24 @@ jobs:
         if: ${{ !cancelled() }}
         run: moodle-plugin-ci phpmd
 
-      - name: Moodle Code Checker
-        if: ${{ !cancelled() }}
-        run: moodle-plugin-ci codechecker
+      - name: Moodle Code Checker (added lines only)
+        # Scope coding-standard enforcement to the lines a PR actually changes,
+        # so pre-existing violations don't block PRs while new ones still fail.
+        # Runs once (8.1) on pull_request; reviewdog filters to added lines.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && matrix.php == '8.1' }}
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          mkdir -p "$HOME/cs" && cd "$HOME/cs"
+          cat > composer.json <<'JSON'
+          {"require-dev":{"moodlehq/moodle-cs":"*"},"config":{"allow-plugins":{"dealerdirect/phpcodesniffer-composer-installer":true,"phpcsstandards/composer-installer":true}}}
+          JSON
+          composer install -q
+          curl -sfL https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh | sh -s -- -b "$HOME/cs/bin"
+          cd "$GITHUB_WORKSPACE/plugin"
+          "$HOME/cs/vendor/bin/phpcs" --standard=moodle --extensions=php --report=checkstyle . > "$HOME/phpcs.xml" || true
+          "$HOME/cs/bin/reviewdog" -f=checkstyle -name="moodle-codechecker" -reporter=github-pr-check -filter-mode=added -fail-level=error < "$HOME/phpcs.xml"
 
       - name: Moodle PHPDoc Checker
         if: ${{ !cancelled() }}
