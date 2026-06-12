@@ -38,7 +38,6 @@ require_once($CFG->dirroot . '/local/reminders/lib.php');
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class calendar_observer {
-
     /**
      * Calls when calendar event updated.
      *
@@ -68,5 +67,4 @@ class calendar_observer {
     public static function calendar_event_added($event) {
         when_calendar_event_updated($event, REMINDERS_CALENDAR_EVENT_ADDED);
     }
-
 }

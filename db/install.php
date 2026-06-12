@@ -33,5 +33,4 @@
 function xmldb_local_reminders_install() {
 
     // What should be done when the plugin is installed for the first time.
-
 }

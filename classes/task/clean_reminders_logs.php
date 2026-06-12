@@ -38,7 +38,6 @@ require_once($CFG->dirroot . '/local/reminders/lib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class clean_reminders_logs extends \core\task\scheduled_task {
-
     /**
      * Executes the cleaning cron task.
      *
@@ -56,5 +55,4 @@ class clean_reminders_logs extends \core\task\scheduled_task {
     public function get_name() {
         return get_string('reminderstaskclean', 'local_reminders');
     }
-
 }
