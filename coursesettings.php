@@ -23,7 +23,7 @@
  */
 
 require('../../config.php');
-require_once($CFG->dirroot.'/local/reminders/coursesettings_form.php');
+require_once($CFG->dirroot . '/local/reminders/coursesettings_form.php');
 
 define('CUSTOM_MINUTE_SECS', 60);
 define('CUSTOM_HOUR_SECS', CUSTOM_MINUTE_SECS * 60);
@@ -50,7 +50,7 @@ if (!$activitysettings) {
     $activitysettings = [];
 } else {
     foreach ($activitysettings as $asetting) {
-        $actkey = 'activity_'.$asetting->eventid.'_'.$asetting->settingkey;
+        $actkey = 'activity_' . $asetting->eventid . '_' . $asetting->settingkey;
         $coursesettings->$actkey = $asetting->settingvalue;
     }
 }
@@ -61,7 +61,7 @@ if (!isset($globalactivityaheaddays)) {
 }
 $aheaddaysindex = [7 => 0, 3 => 1, 1 => 2];
 foreach ($aheaddaysindex as $dkey => $dvalue) {
-    $daykey = 'activityglobal_days'.$dkey;
+    $daykey = 'activityglobal_days' . $dkey;
     $coursesettings->$daykey = $globalactivityaheaddays[$dvalue];
 }
 
@@ -118,10 +118,12 @@ if ($mform->is_cancelled()) {
                 continue;
             }
             $eventid = (int)$keyparts[1];
-            $status = $DB->get_record_sql("SELECT id
+            $status = $DB->get_record_sql(
+                "SELECT id
                 FROM {local_reminders_activityconf}
                 WHERE courseid = :courseid AND eventid = :eventid AND settingkey = :settingkey",
-                ['courseid' => $data->courseid, 'eventid' => $eventid, 'settingkey' => $keyparts[2]]);
+                ['courseid' => $data->courseid, 'eventid' => $eventid, 'settingkey' => $keyparts[2]]
+            );
 
             $actdata = new stdClass();
             $actdata->courseid = $data->courseid;

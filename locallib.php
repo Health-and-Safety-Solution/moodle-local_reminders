@@ -53,16 +53,18 @@ function get_upcoming_events_for_course($courseid, $currtime) {
             return $it != 'open';
         });
     }
-    list($insql, $inparams) = $DB->get_in_or_equal($excludedstatuses, SQL_PARAMS_QM, 'param', false);
+    [$insql, $inparams] = $DB->get_in_or_equal($excludedstatuses, SQL_PARAMS_QM, 'param', false);
 
-    return $DB->get_records_sql("SELECT *
+    return $DB->get_records_sql(
+        "SELECT *
         FROM {event}
         WHERE courseid = $courseid
             AND timestart > $currtime
             AND visible = 1
             AND eventtype $insql
         ORDER BY timestart",
-        $inparams);
+        $inparams
+    );
 }
 
 /**
@@ -76,10 +78,12 @@ function get_upcoming_events_for_course($courseid, $currtime) {
 function fetch_course_activity_settings($courseid, $eventid) {
     global $DB;
 
-    $records = $DB->get_records_sql("SELECT settingkey, settingvalue
+    $records = $DB->get_records_sql(
+        "SELECT settingkey, settingvalue
         FROM {local_reminders_activityconf}
         WHERE courseid = :courseid AND eventid = :eventid",
-        ['courseid' => $courseid, 'eventid' => $eventid]);
+        ['courseid' => $courseid, 'eventid' => $eventid]
+    );
     $pairs = [];
     if (!empty($records)) {
         foreach ($records as $record) {
@@ -98,7 +102,7 @@ function fetch_course_activity_settings($courseid, $eventid) {
  * @param string $keytocheck key to check for.
  * @return bool return true if reminders disabled for activity.
  */
-function has_disabled_reminders_for_activity($courseid, $eventid, $keytocheck=REMINDERS_ENABLED_KEY) {
+function has_disabled_reminders_for_activity($courseid, $eventid, $keytocheck = REMINDERS_ENABLED_KEY) {
     $activitysettings = fetch_course_activity_settings($courseid, $eventid);
     if (array_key_exists($keytocheck, $activitysettings) && !$activitysettings[$keytocheck]) {
         return true;
@@ -115,7 +119,7 @@ function has_disabled_reminders_for_activity($courseid, $eventid, $keytocheck=RE
  * @param object $customtime contains the custom time value and unit (if configured).
  * @return bool true if reminders can sent, otherwise false.
  */
-function should_run_for_activity($event, $options, $aheadday=null, $customtime=null) {
+function should_run_for_activity($event, $options, $aheadday = null, $customtime = null) {
     global $DB, $CFG;
 
     $showtrace = $options->showtrace;
@@ -127,37 +131,41 @@ function should_run_for_activity($event, $options, $aheadday=null, $customtime=n
 
     $activitysettings = fetch_course_activity_settings($courseid, $eventid);
     if (array_key_exists(REMINDERS_ENABLED_KEY, $activitysettings) && !$activitysettings[REMINDERS_ENABLED_KEY]) {
-        $showtrace && mtrace("  [Local Reminder] Reminders for activity event#$eventid (title=$event->name) ".
+        $showtrace && mtrace("  [Local Reminder] Reminders for activity event#$eventid (title=$event->name) " .
             "have been disabled in the course settings.");
         return false;
     } else if (array_key_exists($aheaddayskey, $activitysettings) && !$activitysettings[$aheaddayskey]) {
-        $showtrace && mtrace("  [Local Reminder] Reminders for activity event#$eventid (title=$event->name) ".
+        $showtrace && mtrace("  [Local Reminder] Reminders for activity event#$eventid (title=$event->name) " .
             "have been disabled for $aheadday days ahead.");
         return false;
     } else if ($customtime && array_key_exists("custom", $activitysettings) && !$activitysettings["custom"]) {
-        $showtrace && mtrace("  [Local Reminder] Reminders for activity event#$eventid (title=$event->name) ".
+        $showtrace && mtrace("  [Local Reminder] Reminders for activity event#$eventid (title=$event->name) " .
             "have been disabled for custom time ($customtime->value  $customtime->unit) ahead.");
         return false;
     }
 
     if ($explicitenable) {
         // Must be explicitly enabled the reminders to be sent.
-        if (array_key_exists(REMINDERS_ENABLED_KEY, $activitysettings)
+        if (
+            array_key_exists(REMINDERS_ENABLED_KEY, $activitysettings)
             && $activitysettings[REMINDERS_ENABLED_KEY]
             && array_key_exists($aheaddayskey, $activitysettings)
-            && $activitysettings[$aheaddayskey]) {
+            && $activitysettings[$aheaddayskey]
+        ) {
             return true;
         }
 
         // Handle custom setting.
-        if (array_key_exists(REMINDERS_ENABLED_KEY, $activitysettings)
+        if (
+            array_key_exists(REMINDERS_ENABLED_KEY, $activitysettings)
             && $activitysettings[REMINDERS_ENABLED_KEY]
             && array_key_exists("custom", $activitysettings)
-            && $activitysettings["custom"]) {
+            && $activitysettings["custom"]
+        ) {
             return true;
         }
 
-        $showtrace && mtrace("  [Local Reminder] Reminders for activity event#$eventid (title=$event->name) ".
+        $showtrace && mtrace("  [Local Reminder] Reminders for activity event#$eventid (title=$event->name) " .
             "have explicitly not been enabled in the course settings.");
         return false;
     }
@@ -178,7 +186,7 @@ function should_run_for_activity($event, $options, $aheadday=null, $customtime=n
 function send_overdue_activity_reminders($curtime, $timewindowstart, $activityroleids, $fromuser) {
     global $DB, $CFG;
 
-    mtrace('[LOCAL REMINDERS] Overdue Activity Reminder Cron Started. Events between @('.$timewindowstart.', '.$curtime.')');
+    mtrace('[LOCAL REMINDERS] Overdue Activity Reminder Cron Started. Events between @(' . $timewindowstart . ', ' . $curtime . ')');
 
     if (isset($CFG->local_reminders_enableoverdueactivityreminders) && !$CFG->local_reminders_enableoverdueactivityreminders) {
         mtrace('[LOCAL REMINDERS] Overdue Activity reminders are not enabled from settings! Skipped.');
@@ -187,7 +195,7 @@ function send_overdue_activity_reminders($curtime, $timewindowstart, $activityro
 
     $rangestart = $timewindowstart;
     $statuses = ['due', 'close', 'expectcompletionon', 'gradingdue'];
-    list($insql, $inparams) = $DB->get_in_or_equal($statuses);
+    [$insql, $inparams] = $DB->get_in_or_equal($statuses);
 
     $querysql = "SELECT e.*
         FROM {event} e
@@ -209,7 +217,7 @@ function send_overdue_activity_reminders($curtime, $timewindowstart, $activityro
         $excludedmodules = explode(',', $CFG->local_reminders_excludedmodulenames);
     }
 
-    mtrace('[LOCAL REMINDERS] Number of expired events found for this cron cycle: '.count($allexpiredevents));
+    mtrace('[LOCAL REMINDERS] Number of expired events found for this cron cycle: ' . count($allexpiredevents));
     foreach ($allexpiredevents as $event) {
         $event = new calendar_event($event);
 
@@ -227,20 +235,19 @@ function send_overdue_activity_reminders($curtime, $timewindowstart, $activityro
 
         $reminderref = process_activity_event($event, -1, null, $activityroleids, true, REMINDERS_CALL_TYPE_OVERDUE);
         if (!isset($reminderref)) {
-            mtrace('[LOCAL REMINDERS] Skipped post-activity event for '.$event->id);
+            mtrace('[LOCAL REMINDERS] Skipped post-activity event for ' . $event->id);
             continue;
         }
-        mtrace('[LOCAL REMINDERS] Processing post-activity event for '.$event->id.' occurred @ '.$event->timestart);
+        mtrace('[LOCAL REMINDERS] Processing post-activity event for ' . $event->id . ' occurred @ ' . $event->timestart);
 
         $sendusers = $reminderref->get_sending_users();
-        $ctxinfo = new \stdClass;
+        $ctxinfo = new \stdClass();
         $ctxinfo->overduemessage = $CFG->local_reminders_overduewarnmessage ?? '';
         $ctxinfo->overduetitle = $CFG->local_reminders_overduewarnprefix ?? '';
         $alreadysentuserids = [];
 
         foreach ($sendusers as $touser) {
             try {
-
                 // Check whether already an overdue email is sent or not...
                 if (in_array($touser->id, $alreadysentuserids)) {
                     mtrace("[LOCAL REMINDERS] An overdue reminder has been sent to user $touser->id ($touser->username) " .
@@ -256,10 +263,10 @@ function send_overdue_activity_reminders($curtime, $timewindowstart, $activityro
                 if (!$mailresult) {
                     mtrace("[LOCAL REMINDERS] Could not send out reminder for event#$event->id to user $touser->id");
                 } else {
-                    mtrace('[LOCAL_REMINDERS] Post Activity Mail sent to user: '.$touser->id);
+                    mtrace('[LOCAL_REMINDERS] Post Activity Mail sent to user: ' . $touser->id);
                 }
             } catch (\Throwable $mex) {
-                mtrace('[LOCAL REMINDERS] Error: local/reminders/locallib.php send_post_activity_reminders(): '.$mex->getMessage());
+                mtrace('[LOCAL REMINDERS] Error: local/reminders/locallib.php send_post_activity_reminders(): ' . $mex->getMessage());
             }
         }
 
@@ -268,13 +275,12 @@ function send_overdue_activity_reminders($curtime, $timewindowstart, $activityro
             $activityrecord->sendtime = $curtime;
             $activityrecord->eventid = $event->id;
             $DB->insert_record('local_reminders_post_act', $activityrecord, false);
-            mtrace('[LOCAL REMINDERS] Successfully marked event#'.$event->id.' as overdue sent completed in db.');
-
+            mtrace('[LOCAL REMINDERS] Successfully marked event#' . $event->id . ' as overdue sent completed in db.');
         } catch (\Exception $dex) {
             // Catastrophic failure and not sure what to do at this moment.
             mtrace('[LOCAL REMINDERS] Error: It seems Local Reminders plugin cannot write to database!'
-                .'Please disable overdue reminders until database write access provided!'
-                .$dex->getMessage());
+                . 'Please disable overdue reminders until database write access provided!'
+                . $dex->getMessage());
         }
     }
 }
@@ -315,15 +321,15 @@ function handle_course_activity_event($event, $course, $cm, $options) {
     $sendusers = [];
     $reminder = new due_reminder($event, $course, $context, $cm, $aheadday, $customtime);
 
-    mtrace("   [Local Reminder] Finding out users for event#".$event->id."...");
+    mtrace("   [Local Reminder] Finding out users for event#" . $event->id . "...");
     if ($event->courseid <= 0 && $event->userid > 0) {
         // A user overridden activity.
-        $showtrace && mtrace("  [Local Reminder] Event #".$event->id." is a user overridden ".$event->modulename." event.");
+        $showtrace && mtrace("  [Local Reminder] Event #" . $event->id . " is a user overridden " . $event->modulename . " event.");
         $user = $DB->get_record('user', ['id' => $event->userid]);
         $sendusers[] = $user;
     } else if ($event->groupid > 0) {
         // A group overridden activity.
-        $showtrace && mtrace("  [Local Reminder] Event #".$event->id." is a group overridden ".$event->modulename." event.");
+        $showtrace && mtrace("  [Local Reminder] Event #" . $event->id . " is a group overridden " . $event->modulename . " event.");
         $group = $DB->get_record('groups', ['id' => $event->groupid]);
         $sendusers = get_users_in_group($group);
     } else {
@@ -375,8 +381,14 @@ function handle_course_activity_event($event, $course, $cm, $options) {
  * @param string $calltype calling type PRE|OVERDUE.
  * @return reminder_ref reminder reference instance.
  */
-function process_activity_event($event, $aheadday, $customtime=null, $activityroleids=null, $showtrace=true,
-    $calltype=REMINDERS_CALL_TYPE_PRE) {
+function process_activity_event(
+    $event,
+    $aheadday,
+    $customtime = null,
+    $activityroleids = null,
+    $showtrace = true,
+    $calltype = REMINDERS_CALL_TYPE_PRE
+) {
 
     if (isemptystring($event->modulename)) {
         return null;
@@ -393,7 +405,7 @@ function process_activity_event($event, $aheadday, $customtime=null, $activityro
     $cm = $courseandcm[1];
 
     if (!empty($course) && !empty($cm)) {
-        $options = new \stdClass;
+        $options = new \stdClass();
         $options->aheadday = $aheadday;
         $options->customtime = $customtime;
         $options->showtrace = $showtrace;
@@ -417,8 +429,14 @@ function process_activity_event($event, $aheadday, $customtime=null, $activityro
  * @param string $calltype calling type PRE|OVERDUE.
  * @return reminder_ref reminder reference instance.
  */
-function process_unknown_event($event, $aheadday, $customtime=null, $activityroleids=null, $showtrace=true,
-    $calltype=REMINDERS_CALL_TYPE_PRE) {
+function process_unknown_event(
+    $event,
+    $aheadday,
+    $customtime = null,
+    $activityroleids = null,
+    $showtrace = true,
+    $calltype = REMINDERS_CALL_TYPE_PRE
+) {
 
     if (isemptystring($event->modulename)) {
         $showtrace && mtrace("  [Local Reminder] Unknown event type [$event->eventtype]!");
@@ -438,7 +456,7 @@ function process_unknown_event($event, $aheadday, $customtime=null, $activityrol
  * @param boolean $showtrace whether to print logs or not.
  * @return reminder_ref reminder reference instance.
  */
-function process_course_event($event, $aheadday, $customtime=null, $courseroleids=null, $showtrace=true) {
+function process_course_event($event, $aheadday, $customtime = null, $courseroleids = null, $showtrace = true) {
     global $DB, $PAGE;
 
     $course = $DB->get_record('course', ['id' => $event->courseid]);
@@ -476,7 +494,7 @@ function process_course_event($event, $aheadday, $customtime=null, $courseroleid
  * @param boolean $showtrace whether to print logs or not.
  * @return reminder_ref reminder reference instance.
  */
-function process_category_event($event, $aheadday, $customtime=null, $courseroleids=null, $showtrace=true) {
+function process_category_event($event, $aheadday, $customtime = null, $courseroleids = null, $showtrace = true) {
     global $CFG;
 
     $catid = $event->categoryid;
@@ -505,7 +523,7 @@ function process_category_event($event, $aheadday, $customtime=null, $courserole
             $showtrace && mtrace("   [LOCAL REMINDERS]   - Course skipped: $course->id => $course->fullname");
         }
     }
-    $showtrace && mtrace("   [LOCAL REMINDERS] Total users to send = ".count($allusers));
+    $showtrace && mtrace("   [LOCAL REMINDERS] Total users to send = " . count($allusers));
 
     $reminder = new category_reminder($event, $cat, $aheadday, $customtime);
     return new reminder_ref($reminder, $allusers);
@@ -520,7 +538,7 @@ function process_category_event($event, $aheadday, $customtime=null, $courserole
  * @param boolean $showtrace whether to print logs or not.
  * @return reminder_ref reminder reference instance.
  */
-function process_group_event($event, $aheadday, $customtime=null, $showtrace=true) {
+function process_group_event($event, $aheadday, $customtime = null, $showtrace = true) {
     global $DB, $PAGE;
 
     $group = $DB->get_record('groups', ['id' => $event->groupid]);
@@ -554,7 +572,7 @@ function process_group_event($event, $aheadday, $customtime=null, $showtrace=tru
  * @param object $customtime contains the custom time value and unit (if configured).
  * @return reminder_ref reminder reference instance.
  */
-function process_user_event($event, $aheadday, $customtime=null) {
+function process_user_event($event, $aheadday, $customtime = null) {
     global $DB;
 
     $user = $DB->get_record('user', ['id' => $event->userid, 'deleted' => 0]);
@@ -575,7 +593,7 @@ function process_user_event($event, $aheadday, $customtime=null) {
  * @param object $customtime contains the custom time value and unit (if configured).
  * @return reminder_ref reminder reference instance.
  */
-function process_site_event($event, $aheadday, $customtime=null) {
+function process_site_event($event, $aheadday, $customtime = null) {
     global $DB, $PAGE;
 
     $reminder = new site_reminder($event, $aheadday, $customtime);
@@ -638,9 +656,11 @@ function get_users_of_course($courseid, $courseroleids, &$arraytoappend) {
     $PAGE->set_context($context);
     $roleusers = get_role_users($courseroleids, $context, true, 'ra.id as ra_id, u.*');
     $senduserids = array_map(
-    function($u) {
-        return $u->id;
-    }, $roleusers);
+        function ($u) {
+            return $u->id;
+        },
+        $roleusers
+    );
     $senduserrefs = array_combine($senduserids, $roleusers);
     foreach ($senduserids as $userid) {
         if (!array_key_exists($userid, $arraytoappend)) {
@@ -675,7 +695,7 @@ function reminders_get_timezone($user) {
  * @param string $mode mode of rendering. html or plain.
  * @return string formatted time string
  */
-function format_event_time_duration($user, $event, $tzstyle=null, $includetz=true, $mode='html') {
+function format_event_time_duration($user, $event, $tzstyle = null, $includetz = true, $mode = 'html') {
     $followedtimeformat = get_string('strftimedaydate', 'langconfig');
     $usertimeformat = get_correct_timeformat_user($user);
 
@@ -696,22 +716,21 @@ function format_event_time_duration($user, $event, $tzstyle=null, $includetz=tru
         if ($sdate['year'] == $ddate['year'] && $sdate['mon'] == $ddate['mon'] && $sdate['mday'] == $ddate['mday']) {
             // Bug fix for not correctly displaying times in incorrect formats.
             // Issue report: https://tracker.moodle.org/browse/CONTRIB-3647?focusedCommentId=408657.
-            $formattedtime .= ' - '.userdate($etime, $usertimeformat, $tzone);
+            $formattedtime .= ' - ' . userdate($etime, $usertimeformat, $tzone);
             $addflag = true;
         } else {
-            $formattedtime .= ' - '.
-                userdate($etime, $followedtimeformat, $tzone)." ".
+            $formattedtime .= ' - ' .
+                userdate($etime, $followedtimeformat, $tzone) . " " .
                 userdate($etime, $usertimeformat, $tzone);
         }
 
         if ($addflag) {
-            $formattedtime = $formattedtimeprefix.'  ['.$formattedtime.']';
+            $formattedtime = $formattedtimeprefix . '  [' . $formattedtime . ']';
         } else {
-            $formattedtime = $formattedtimeprefix.' '.$formattedtime;
+            $formattedtime = $formattedtimeprefix . ' ' . $formattedtime;
         }
-
     } else {
-        $formattedtime = $formattedtimeprefix.' '.$formattedtime;
+        $formattedtime = $formattedtimeprefix . ' ' . $formattedtime;
     }
 
     if (!$includetz) {
@@ -721,13 +740,13 @@ function format_event_time_duration($user, $event, $tzstyle=null, $includetz=tru
     $tzstr = local_reminders_tz_info::get_human_readable_tz($tzone);
     if ($mode == 'html') {
         if (!isemptystring($tzstyle)) {
-            $tzstr = '<span style="'.$tzstyle.'">'.$tzstr.'</span>';
+            $tzstr = '<span style="' . $tzstyle . '">' . $tzstr . '</span>';
         } else {
-            $tzstr = '<span style="font-size:13px;color: #888;">'.$tzstr.'</span>';
+            $tzstr = '<span style="font-size:13px;color: #888;">' . $tzstr . '</span>';
         }
-        return $formattedtime.' &nbsp;&nbsp;'.$tzstr;
+        return $formattedtime . ' &nbsp;&nbsp;' . $tzstr;
     } else {
-        return $formattedtime.' - '.$tzstr;
+        return $formattedtime . ' - ' . $tzstr;
     }
 }
 
@@ -761,10 +780,19 @@ function get_correct_timeformat_user($user) {
  * @return array of user records
  */
 function get_active_role_users($activityroleids, $context) {
-    return get_role_users($activityroleids, $context, true, 'ra.id as ra_id, u.*',
-                    null, false, '', '', '',
-                    'ue.status = :userenrolstatus',
-                    ['userenrolstatus' => ENROL_USER_ACTIVE]);
+    return get_role_users(
+        $activityroleids,
+        $context,
+        true,
+        'ra.id as ra_id, u.*',
+        null,
+        false,
+        '',
+        '',
+        '',
+        'ue.status = :userenrolstatus',
+        ['userenrolstatus' => ENROL_USER_ACTIVE]
+    );
 }
 
 /**
@@ -785,19 +813,19 @@ function filter_user_group_overrides($event, $sendusers, $showtrace) {
 
     $showtrace && mtrace("  [Local Reminder] Event supports overrides for key ");
     $idcolumn = REMINDERS_SUPPORTED_OVERRIDES_REF_IDS[$event->modulename];
-    $overridesrecords = $DB->get_records($event->modulename.'_overrides', [$idcolumn => $event->instance]);
+    $overridesrecords = $DB->get_records($event->modulename . '_overrides', [$idcolumn => $event->instance]);
     if (empty($overridesrecords)) {
-        $showtrace && mtrace("  [Local Reminder] No overrides for activity ".$event->instance."!");
+        $showtrace && mtrace("  [Local Reminder] No overrides for activity " . $event->instance . "!");
         return $sendusers;
     }
 
     $extendedusers = [];
     foreach ($overridesrecords as $record) {
         if ($record->userid > 0) {
-            $showtrace && mtrace("     Overrides for user id: ".$record->userid);
+            $showtrace && mtrace("     Overrides for user id: " . $record->userid);
             $extendedusers[] = $record->userid;
         } else if ($record->groupid > 0) {
-            $showtrace && mtrace("     Overrides for group id: ".$record->groupid);
+            $showtrace && mtrace("     Overrides for group id: " . $record->groupid);
             $groupmemberroles = groups_get_members_by_role($record->groupid, $event->courseid, 'u.id');
             if (!empty($groupmemberroles)) {
                 foreach ($groupmemberroles as $roleid => $roledata) {
@@ -809,7 +837,7 @@ function filter_user_group_overrides($event, $sendusers, $showtrace) {
         }
     }
 
-    $finalarray = array_filter($sendusers, function($it) use ($extendedusers) {
+    $finalarray = array_filter($sendusers, function ($it) use ($extendedusers) {
         return !in_array($it->id, $extendedusers);
     });
     return $finalarray;
@@ -882,7 +910,7 @@ function isemptystring($str) {
  * @return individual module instance (a quiz, a assignment, etc).
  *          If fails returns null
  */
-function fetch_module_instance($modulename, $instance, $courseid=0, $showtrace=true) {
+function fetch_module_instance($modulename, $instance, $courseid = 0, $showtrace = true) {
     global $DB;
 
     $params = ['instance' => $instance, 'modulename' => $modulename];
@@ -897,14 +925,14 @@ function fetch_module_instance($modulename, $instance, $courseid=0, $showtrace=t
     $sql = "SELECT m.*
               FROM {course_modules} cm
                    JOIN {modules} md ON md.id = cm.module
-                   JOIN {".$modulename."} m ON m.id = cm.instance
+                   JOIN {" . $modulename . "} m ON m.id = cm.instance
              WHERE m.id = :instance AND md.name = :modulename
                    $courseselect";
 
     try {
         return $DB->get_record_sql($sql, $params, IGNORE_MISSING);
     } catch (moodle_exception $mex) {
-        $showtrace && mtrace('  [Local Reminder - ERROR] Failed to fetch module instance! '.$mex.getMessage);
+        $showtrace && mtrace('  [Local Reminder - ERROR] Failed to fetch module instance! ' . $mex . getMessage);
         return null;
     }
 }
@@ -979,89 +1007,4 @@ class local_reminders_tz_info extends \core_date {
     }
 }
 
-/**
- * Reminder reference class.
- *
- * @package    local_reminders
- * @copyright  2012 Isuru Madushanka Weerarathna
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- */
-class reminder_ref {
-    /**
-     * created reminder reference.
-     *
-     * @var local_reminder
-     */
-    protected $reminder;
-    /**
-     * Array of users to send this reminder.
-     *
-     * @var array
-     */
-    protected $sendusers;
-
-    /**
-     * Creates new reminder reference.
-     *
-     * @param local_reminder $reminder created reminder.
-     * @param array $sendusers array of users.
-     */
-    public function __construct($reminder, $sendusers) {
-        $this->reminder = $reminder;
-        $this->sendusers = $sendusers;
-    }
-
-    /**
-     * Returns total number of users eligible to send this reminder.
-     *
-     * @return int total number of users.
-     */
-    public function get_total_users_to_send() {
-        return count($this->sendusers);
-    }
-
-    /**
-     * Returns the ultimate notification event instance to send for given user.
-     *
-     * @param object $fromuser from user.
-     * @param object $touser user to send.
-     * @return object new notification instance.
-     */
-    public function get_event_to_send($fromuser, $touser) {
-        return $this->reminder->get_sending_event($fromuser, $touser);
-    }
-
-    /**
-     * Returns the notification event instance based on change type.
-     *
-     * @param string $changetype change type PRE|OVERDUE.
-     * @param object $fromuser from user.
-     * @param object $touser user to send.
-     * @param stdClass $ctxinfo additional context info needed to process.
-     * @return object new notification instance.
-     */
-    public function get_updating_send_event($changetype, $fromuser, $touser, $ctxinfo) {
-        return $this->reminder->get_updating_event_message($changetype, $fromuser, $touser, $ctxinfo);
-    }
-
-    /**
-     * Returns eligible sending users as array.
-     *
-     * @return array users eligible to receive message.
-     */
-    public function get_sending_users() {
-        return $this->sendusers;
-    }
-
-    /**
-     * Cleanup the reminder memory.
-     *
-     * @return void nothing.
-     */
-    public function cleanup() {
-        unset($this->sendusers);
-        if (isset($this->reminder)) {
-            $this->reminder->cleanup();
-        }
-    }
-}
+require_once(__DIR__ . '/reminder_ref.class.php');

@@ -141,21 +141,23 @@ function local_reminders_cron_pre($currtime, $timewindowstart) {
 
     // Append custom schedule if any of event categories has defined it.
     foreach ($eventtypearray as $etype) {
-        $tempconfigstr = 'local_reminders_'.$etype.'custom';
-        if (isset($CFG->$tempconfigstr) && !empty($CFG->$tempconfigstr)
-            && $CFG->$tempconfigstr > 0 && !in_array($CFG->$tempconfigstr, $secondsaheads)) {
+        $tempconfigstr = 'local_reminders_' . $etype . 'custom';
+        if (
+            isset($CFG->$tempconfigstr) && !empty($CFG->$tempconfigstr)
+            && $CFG->$tempconfigstr > 0 && !in_array($CFG->$tempconfigstr, $secondsaheads)
+        ) {
             array_push($secondsaheads, $CFG->$tempconfigstr);
         }
     }
 
-    $whereclause = '(timestart > '.$timewindowend.') AND (';
+    $whereclause = '(timestart > ' . $timewindowend . ') AND (';
     $flagor = false;
     foreach ($secondsaheads as $sahead) {
         if ($flagor) {
             $whereclause .= ' OR ';
         }
-        $whereclause .= '(timestart - '.$sahead.' >= '.$timewindowstart.' AND '.
-                        'timestart - '.$sahead.' <= '.$timewindowend.')';
+        $whereclause .= '(timestart - ' . $sahead . ' >= ' . $timewindowstart . ' AND ' .
+                        'timestart - ' . $sahead . ' <= ' . $timewindowend . ')';
         $flagor = true;
     }
     $whereclause .= ')';
@@ -166,7 +168,7 @@ function local_reminders_cron_pre($currtime, $timewindowstart) {
         }
     }
 
-    mtrace("   [Local Reminder] Time window: ".userdate($timewindowstart)." to ".userdate($timewindowend));
+    mtrace("   [Local Reminder] Time window: " . userdate($timewindowstart) . " to " . userdate($timewindowend));
 
     $upcomingevents = $DB->get_records_select('event', $whereclause);
     if (!$upcomingevents) {
@@ -176,7 +178,7 @@ function local_reminders_cron_pre($currtime, $timewindowstart) {
         return;
     }
 
-    mtrace("   [Local Reminder] Found ".count($upcomingevents)." upcoming events. Continuing...");
+    mtrace("   [Local Reminder] Found " . count($upcomingevents) . " upcoming events. Continuing...");
 
     $fromuser = get_from_user();
     $excludedmodules = [];
@@ -214,28 +216,35 @@ function local_reminders_cron_pre($currtime, $timewindowstart) {
         $fromcustom = false;
         $customtime = null;
 
-        if ($event->timestart - REMINDERS_1DAYBEFORE_INSECONDS >= $timewindowstart &&
-                $event->timestart - REMINDERS_1DAYBEFORE_INSECONDS <= $timewindowend) {
+        if (
+            $event->timestart - REMINDERS_1DAYBEFORE_INSECONDS >= $timewindowstart &&
+                $event->timestart - REMINDERS_1DAYBEFORE_INSECONDS <= $timewindowend
+        ) {
             $aheadday = 1;
-        } else if ($event->timestart - REMINDERS_3DAYSBEFORE_INSECONDS >= $timewindowstart &&
-                $event->timestart - REMINDERS_3DAYSBEFORE_INSECONDS <= $timewindowend) {
+        } else if (
+            $event->timestart - REMINDERS_3DAYSBEFORE_INSECONDS >= $timewindowstart &&
+                $event->timestart - REMINDERS_3DAYSBEFORE_INSECONDS <= $timewindowend
+        ) {
             $aheadday = 3;
-        } else if ($event->timestart - REMINDERS_7DAYSBEFORE_INSECONDS >= $timewindowstart &&
-                $event->timestart - REMINDERS_7DAYSBEFORE_INSECONDS <= $timewindowend) {
+        } else if (
+            $event->timestart - REMINDERS_7DAYSBEFORE_INSECONDS >= $timewindowstart &&
+                $event->timestart - REMINDERS_7DAYSBEFORE_INSECONDS <= $timewindowend
+        ) {
             $aheadday = 7;
         } else {
             // Find if custom schedule has been defined by user.
             // For unknown event types, we will try with the schedule defined for activities, only if configured so.
-            $tempconfigstr = 'local_reminders_'.$event->eventtype.'custom';
+            $tempconfigstr = 'local_reminders_' . $event->eventtype . 'custom';
             if (!isset($CFG->$tempconfigstr) && $fallbacktocustomactivity) {
                 $tempconfigstr = 'local_reminders_duecustom';
             }
 
             if (isset($CFG->$tempconfigstr) && !empty($CFG->$tempconfigstr) && $CFG->$tempconfigstr > 0) {
                 $customsecs = $CFG->$tempconfigstr;
-                if ($event->timestart - $customsecs >= $timewindowstart &&
-                    $event->timestart - $customsecs <= $timewindowend) {
-
+                if (
+                    $event->timestart - $customsecs >= $timewindowstart &&
+                    $event->timestart - $customsecs <= $timewindowend
+                ) {
                     foreach ($customtimeunits as $unitkey => $unitvalue) {
                         $remainder = $customsecs % $unitvalue;
                         if ($remainder == 0) {
@@ -296,9 +305,8 @@ function local_reminders_cron_pre($currtime, $timewindowstart) {
                     "[event#$event->id is ignored!]...");
                 continue;
             }
-
         } else {
-            mtrace("   [Local Reminder] A reminder can be sent for event#$event->id ($event->eventtype), ".
+            mtrace("   [Local Reminder] A reminder can be sent for event#$event->id ($event->eventtype), " .
                     "detected through custom schedule.");
         }
 
@@ -328,12 +336,14 @@ function local_reminders_cron_pre($currtime, $timewindowstart) {
                         mtrace("  [Local Reminder] Reminders for activity openings has been restricted in the configs.");
                         break;
                     }
+                    // No break - intentional fall through.
                 case 'close':
                     // If we dont want to send reminders for activity closings.
                     if (isset($CFG->local_reminders_duesend) && $CFG->local_reminders_duesend == REMINDERS_ACTIVITY_ONLY_OPENINGS) {
                         mtrace("  [Local Reminder] Reminders for activity closings has been restricted in the configs.");
                         break;
                     }
+                    // No break - intentional fall through.
                 case 'due':
                 case 'zoom':
                     if (has_disabled_reminders_for_activity($event->courseid, $event->id)) {
@@ -343,12 +353,17 @@ function local_reminders_cron_pre($currtime, $timewindowstart) {
                         mtrace("  [Local Reminder] Activity event $event->id reminders disabled for $aheadday days ahead.");
                         break;
                     } else if ($fromcustom && has_disabled_reminders_for_activity($event->courseid, $event->id, "custom")) {
-                        mtrace("  [Local Reminder] Activity event $event->id reminders disabled ".
+                        mtrace("  [Local Reminder] Activity event $event->id reminders disabled " .
                             "for custom time ($customtime->value  $customtime->unit) ahead.");
                         break;
                     }
-                    $reminderref = process_activity_event($event, $aheadday, $customtime, $activityroleids,
-                        REMINDERS_CALL_TYPE_PRE);
+                    $reminderref = process_activity_event(
+                        $event,
+                        $aheadday,
+                        $customtime,
+                        $activityroleids,
+                        REMINDERS_CALL_TYPE_PRE
+                    );
                     break;
 
                 case 'group':
@@ -358,17 +373,16 @@ function local_reminders_cron_pre($currtime, $timewindowstart) {
                 default:
                     $reminderref = process_unknown_event($event, $aheadday, $customtime, $activityroleids, REMINDERS_CALL_TYPE_PRE);
             }
-
         } catch (Exception $ex) {
-            mtrace("  [Local Reminder - ERROR] Error occured when initializing ".
-                    "for event#[$event->id] (type: $event->eventtype) ".$ex->getMessage());
-            mtrace("  [Local Reminder - ERROR] ".$ex->getTraceAsString());
+            mtrace("  [Local Reminder - ERROR] Error occured when initializing " .
+                    "for event#[$event->id] (type: $event->eventtype) " . $ex->getMessage());
+            mtrace("  [Local Reminder - ERROR] " . $ex->getTraceAsString());
             continue;
         }
 
         if ($reminderref == null) {
             mtrace("  [Local Reminder] Reminder is not available for the event $event->id "
-                ."[type: $event->eventtype, mod: $event->modulename]");
+                . "[type: $event->eventtype, mod: $event->modulename]");
             continue;
         }
 
@@ -386,7 +400,6 @@ function local_reminders_cron_pre($currtime, $timewindowstart) {
         $alreadysentuserids = [];
 
         foreach ($sendusers as $touser) {
-
             // Check whether already an email is sent or not...
             if (in_array($touser->id, $alreadysentuserids)) {
                 mtrace("   [Local Reminder] A reminder has been sent to user $touser->id ($touser->username) " .
@@ -403,11 +416,11 @@ function local_reminders_cron_pre($currtime, $timewindowstart) {
                 if (!$mailresult) {
                     mtrace("Could not send out reminder for event#$event->id to user $touser->id");
                 } else {
-                    mtrace('[LOCAL_REMINDERS] Mail successfully sent to user: '.$touser->id);
+                    mtrace('[LOCAL_REMINDERS] Mail successfully sent to user: ' . $touser->id);
                 }
             } catch (\Throwable $mex) {
                 $failedcount++;
-                mtrace('Error: local/reminders/lib.php local_reminders_cron(): '.$mex->getMessage());
+                mtrace('Error: local/reminders/lib.php local_reminders_cron(): ' . $mex->getMessage());
             }
         }
 
@@ -534,7 +547,7 @@ function when_calendar_event_updated($updateevent, $changetype) {
         return;
     }
 
-    $enabledoptionskey = 'local_reminders_enable_'.strtolower($event->eventtype).'forcalevents';
+    $enabledoptionskey = 'local_reminders_enable_' . strtolower($event->eventtype) . 'forcalevents';
     if (!isset($CFG->$enabledoptionskey) || !$CFG->$enabledoptionskey) {
         return;
     }
@@ -583,11 +596,13 @@ function when_calendar_event_updated($updateevent, $changetype) {
             if (isset($CFG->local_reminders_duesend) && $CFG->local_reminders_duesend == REMINDERS_ACTIVITY_ONLY_CLOSINGS) {
                 break;
             }
+            // No break - intentional fall through.
         case 'close':
             // If we dont want to send reminders for activity closings.
             if (isset($CFG->local_reminders_duesend) && $CFG->local_reminders_duesend == REMINDERS_ACTIVITY_ONLY_OPENINGS) {
                 break;
             }
+            // No break - intentional fall through.
         case 'due':
             if (has_disabled_reminders_for_activity($event->courseid, $event->id)) {
                 break;
@@ -612,7 +627,7 @@ function when_calendar_event_updated($updateevent, $changetype) {
         return;
     }
 
-    $ctxinfo = new \stdClass;
+    $ctxinfo = new \stdClass();
     $ctxinfo->overduemessage = $CFG->local_reminders_overduewarnmessage ?? '';
     $ctxinfo->overduetitle = $CFG->local_reminders_overduewarnprefix ?? '';
     foreach ($sendusers as $touser) {
@@ -635,7 +650,7 @@ function clean_local_reminders_logs() {
     if ($recordcount > 0) {
         mtrace('  [Local Reminders][CLEAN] Cleaning can be executed now as there are newer records.');
         $deletestatus = $DB->delete_records_select(REMINDERS_CLEAN_TABLE, "time < $cutofftime");
-        mtrace('  [Local Reminders][CLEAN] Cleaning status: '.$deletestatus);
+        mtrace('  [Local Reminders][CLEAN] Cleaning status: ' . $deletestatus);
     } else {
         mtrace('  [Local Reminders][CLEAN] No records allow to clean since reminders cron has not bee executed for long time!');
     }

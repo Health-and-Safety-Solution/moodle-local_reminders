@@ -36,7 +36,6 @@ require_once($CFG->dirroot . '/local/reminders/reminder.class.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class course_reminder extends local_reminder {
-
     /**
      * Course reference.
      *
@@ -65,28 +64,34 @@ class course_reminder extends local_reminder {
      * @param stdClass $ctxinfo additional context info needed to process.
      * @return string Message content as HTML text.
      */
-    public function get_message_html($user=null, $changetype=null, $ctxinfo=null) {
+    public function get_message_html($user = null, $changetype = null, $ctxinfo = null) {
         $htmlmail = $this->get_html_header();
         $htmlmail .= html_writer::start_tag('body', ['id' => 'email']);
         $htmlmail .= $this->get_reminder_header();
         $htmlmail .= html_writer::start_tag('div');
-        $htmlmail .= html_writer::start_tag('table',
-                ['cellspacing' => 0, 'cellpadding' => 8, 'style' => $this->tbodycssstyle]);
+        $htmlmail .= html_writer::start_tag(
+            'table',
+            ['cellspacing' => 0, 'cellpadding' => 8, 'style' => $this->tbodycssstyle]
+        );
 
         $contenttitle = $this->get_message_title();
         if (!isemptystring($changetype)) {
-            $titleprefixlangstr = get_string('calendarevent'.strtolower($changetype).'prefix', 'local_reminders');
+            $titleprefixlangstr = get_string('calendarevent' . strtolower($changetype) . 'prefix', 'local_reminders');
             $contenttitle = "[$titleprefixlangstr]: $contenttitle";
         }
         $htmlmail .= html_writer::start_tag('tr');
         $htmlmail .= html_writer::start_tag('td', ['colspan' => 2]);
-        $htmlmail .= html_writer::link($this->generate_event_link(),
-                html_writer::tag('h3', $contenttitle, ['style' => $this->titlestyle]),
-                ['style' => 'text-decoration: none']);
-        $htmlmail .= html_writer::end_tag('td').html_writer::end_tag('tr');
+        $htmlmail .= html_writer::link(
+            $this->generate_event_link(),
+            html_writer::tag('h3', $contenttitle, ['style' => $this->titlestyle]),
+            ['style' => 'text-decoration: none']
+        );
+        $htmlmail .= html_writer::end_tag('td') . html_writer::end_tag('tr');
 
-        $htmlmail .= $this->write_table_row(get_string('contentwhen', 'local_reminders'),
-            format_event_time_duration($user, $this->event));
+        $htmlmail .= $this->write_table_row(
+            get_string('contentwhen', 'local_reminders'),
+            format_event_time_duration($user, $this->event)
+        );
         $htmlmail .= $this->write_location_info($this->event);
 
         $htmlmail .= $this->write_table_row(get_string('contenttypecourse', 'local_reminders'), $this->course->fullname);
@@ -95,9 +100,9 @@ class course_reminder extends local_reminder {
         $htmlmail .= $this->write_description($description, $this->event);
 
         $htmlmail .= $this->get_html_footer();
-        return $htmlmail.html_writer::end_tag('table').
-            html_writer::end_tag('div').
-            html_writer::end_tag('body').
+        return $htmlmail . html_writer::end_tag('table') .
+            html_writer::end_tag('div') .
+            html_writer::end_tag('body') .
             html_writer::end_tag('html');
     }
 
@@ -108,11 +113,11 @@ class course_reminder extends local_reminder {
      * @param object $changetype change type (add/update/removed)
      * @return string Message content as plain-text.
      */
-    public function get_message_plaintext($user=null, $changetype=null) {
-        $text = $this->get_message_title().' '.$this->get_aheaddays_plain()."\n";
-        $text .= get_string('contentwhen', 'local_reminders').': '.$this->get_tzinfo_plain($user, $this->event)."\n";
-        $text .= get_string('contenttypecourse', 'local_reminders').': '.$this->course->fullname."\n";
-        $text .= get_string('contentdescription', 'local_reminders').': '.$this->event->description."\n";
+    public function get_message_plaintext($user = null, $changetype = null) {
+        $text = $this->get_message_title() . ' ' . $this->get_aheaddays_plain() . "\n";
+        $text .= get_string('contentwhen', 'local_reminders') . ': ' . $this->get_tzinfo_plain($user, $this->event) . "\n";
+        $text .= get_string('contenttypecourse', 'local_reminders') . ': ' . $this->course->fullname . "\n";
+        $text .= get_string('contentdescription', 'local_reminders') . ': ' . $this->event->description . "\n";
 
         return $text;
     }
@@ -132,8 +137,8 @@ class course_reminder extends local_reminder {
      * @param string $type type of message to be send (null=reminder cron)
      * @return string Message title as a plain-text.
      */
-    public function get_message_title($type=null) {
-        return '('.$this->course->shortname.') '.$this->event->name;
+    public function get_message_title($type = null) {
+        return '(' . $this->course->shortname . ') ' . $this->event->name;
     }
 
     /**
@@ -144,8 +149,8 @@ class course_reminder extends local_reminder {
     public function get_custom_headers() {
         $headers = parent::get_custom_headers();
 
-        $headers[] = 'X-Course-Id: '.$this->course->id;
-        $headers[] = 'X-Course-Name: '.format_string($this->course->fullname, true);
+        $headers[] = 'X-Course-Id: ' . $this->course->id;
+        $headers[] = 'X-Course-Name: ' . format_string($this->course->fullname, true);
 
         return $headers;
     }
