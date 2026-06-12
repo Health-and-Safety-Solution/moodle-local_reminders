@@ -23,6 +23,8 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+// Sends email reminders to users for Moodle calendar events.
+
 defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/local/reminders/reminder.class.php');
@@ -497,184 +499,11 @@ function get_timewindow_starttime($currtime) {
 function has_denied_for_events($changetype) {
     global $CFG;
 
-    if ($changetype == REMINDERS_CALENDAR_EVENT_UPDATED) {
-        return !isset($CFG->local_reminders_enable_whenchanged) || !$CFG->local_reminders_enable_whenchanged;
-    } else if ($changetype == REMINDERS_CALENDAR_EVENT_ADDED) {
-        return !isset($CFG->local_reminders_enable_whenadded) || !$CFG->local_reminders_enable_whenadded;
-    } else if ($changetype == REMINDERS_CALENDAR_EVENT_REMOVED) {
-        return !isset($CFG->local_reminders_enable_whenremoved) || !$CFG->local_reminders_enable_whenremoved;
+    if (isset($CFG->{'local_reminders_'.$changetype})) {
+        $settingval = $CFG->{'local_reminders_'.$changetype};
+        if ($settingval == 0) {
+            return true;
+        }
     }
     return false;
-}
-
-/**
- * Calls when calendar event created/updated/deleted.
- *
- * @param object $updateevent calendar event instance.
- * @param object $changetype change type (added/updated/removed).
- * @return void.
- */
-function when_calendar_event_updated($updateevent, $changetype) {
-    global $CFG;
-
-    // Not allowed to continue.
-    if (has_denied_for_events($changetype)) {
-        return;
-    }
-
-    $event = null;
-    if ($changetype == REMINDERS_CALENDAR_EVENT_REMOVED) {
-        $event = $updateevent->get_record_snapshot($updateevent->objecttable, $updateevent->objectid);
-    } else {
-        $event = calendar_event::load($updateevent->objectid);
-    }
-
-    // if this is a repeating event, we skip all the upcoming events except for the first one.
-    if ($event->repeatid > 0 && $event->repeatid != $event->id) {
-        return;
-    }
-
-    $enabledoptionskey = 'local_reminders_enable_'.strtolower($event->eventtype).'forcalevents';
-    if (!isset($CFG->$enabledoptionskey) || !$CFG->$enabledoptionskey) {
-        return;
-    }
-
-    $currtime = time();
-    $diffsecondsuntil = $event->timestart - $currtime;
-    if ($diffsecondsuntil < 0) {
-        return;
-    }
-    $aheadday = floor($diffsecondsuntil / (REMINDERS_DAYIN_SECONDS * 1.0));
-
-    $excludedmodules = [];
-    if (isset($CFG->local_reminders_excludedmodulenames)) {
-        $excludedmodules = explode(',', $CFG->local_reminders_excludedmodulenames);
-    }
-    if (in_array($event->modulename, $excludedmodules)) {
-        return;
-    }
-
-    $reminderref = null;
-    $tmprolesreminders = get_roles_for_reminders();
-    $courseroleids = $tmprolesreminders[0];
-    $activityroleids = $tmprolesreminders[1];
-    $categoryroleids = $tmprolesreminders[2];
-    $fromuser = get_from_user();
-
-    switch ($event->eventtype) {
-        case 'site':
-            $reminderref = process_site_event($event, $aheadday);
-            break;
-
-        case 'user':
-            $reminderref = process_user_event($event, $aheadday);
-            break;
-
-        case 'category':
-            $reminderref = process_category_event($event, $aheadday, null, $categoryroleids, false);
-            break;
-
-        case 'course':
-            $reminderref = process_course_event($event, $aheadday, null, $courseroleids, false);
-            break;
-
-        case 'open':
-            // If we dont want to send reminders for activity openings.
-            if (isset($CFG->local_reminders_duesend) && $CFG->local_reminders_duesend == REMINDERS_ACTIVITY_ONLY_CLOSINGS) {
-                break;
-            }
-        case 'close':
-            // If we dont want to send reminders for activity closings.
-            if (isset($CFG->local_reminders_duesend) && $CFG->local_reminders_duesend == REMINDERS_ACTIVITY_ONLY_OPENINGS) {
-                break;
-            }
-        case 'due':
-            if (has_disabled_reminders_for_activity($event->courseid, $event->id)) {
-                break;
-            }
-            $reminderref = process_activity_event($event, $aheadday, null, $activityroleids, false);
-            break;
-
-        case 'group':
-            $reminderref = process_group_event($event, $aheadday, null, false);
-            break;
-
-        default:
-            $reminderref = process_unknown_event($event, $aheadday, null, $activityroleids, false);
-    }
-
-    if ($reminderref == null) {
-        return;
-    }
-
-    $sendusers = $reminderref->get_sending_users();
-    if ($reminderref->get_total_users_to_send() == 0) {
-        return;
-    }
-
-    $ctxinfo = new \stdClass;
-    $ctxinfo->overduemessage = $CFG->local_reminders_overduewarnmessage ?? '';
-    $ctxinfo->overduetitle = $CFG->local_reminders_overduewarnprefix ?? '';
-    foreach ($sendusers as $touser) {
-        $eventdata = $reminderref->get_updating_send_event($changetype, $fromuser, $touser, $ctxinfo);
-
-        $mailresult = message_send($eventdata);
-    }
-    $reminderref->cleanup();
-}
-
-/**
- * Cleans the local_reminders table by deleting older unnecessary records.
- */
-function clean_local_reminders_logs() {
-    global $CFG, $DB, $PAGE;
-
-    $cutofftime = time() - REMINDERS_7DAYSBEFORE_INSECONDS;
-    mtrace("  [Local Reminders][CLEAN] clean cutoff time: $cutofftime");
-    $recordcount = $DB->count_records_select(REMINDERS_CLEAN_TABLE, "time >= $cutofftime");
-    if ($recordcount > 0) {
-        mtrace('  [Local Reminders][CLEAN] Cleaning can be executed now as there are newer records.');
-        $deletestatus = $DB->delete_records_select(REMINDERS_CLEAN_TABLE, "time < $cutofftime");
-        mtrace('  [Local Reminders][CLEAN] Cleaning status: '.$deletestatus);
-    } else {
-        mtrace('  [Local Reminders][CLEAN] No records allow to clean since reminders cron has not bee executed for long time!');
-    }
-}
-
-/**
- * Function to render settings customization per course.
- *
- * @param object $settingsnav settings navigation.
- * @param object $context current context.
- * @return void.
- */
-function local_reminders_extend_settings_navigation($settingsnav, $context) {
-    global $PAGE;
-
-    // Only add this settings item on non-site course pages.
-    if (!$PAGE->course || $PAGE->course->id == 1) {
-        return;
-    }
-
-    // Only let users with the appropriate capability see this settings item.
-    if (!has_capability('moodle/course:update', context_course::instance($PAGE->course->id))) {
-        return;
-    }
-
-    if ($settingnode = $settingsnav->find('courseadmin', navigation_node::TYPE_COURSE)) {
-        $name = get_string('admintreelabel', 'local_reminders');
-        $url = new moodle_url('/local/reminders/coursesettings.php', ['courseid' => $PAGE->course->id]);
-        $navnode = navigation_node::create(
-            $name,
-            $url,
-            navigation_node::NODETYPE_LEAF,
-            'reminders',
-            'reminders',
-            new pix_icon('i/calendar', $name)
-        );
-        if ($PAGE->url->compare($url, URL_MATCH_BASE)) {
-            $navnode->make_active();
-        }
-        $settingnode->add_node($navnode);
-    }
 }
